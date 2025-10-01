@@ -2,5 +2,3 @@ streamlit
 tensorflow==2.16.2
 keras
 opencv-python-headless
-numpy
-Pillow
