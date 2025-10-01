@@ -1,48 +1,41 @@
 import streamlit as st
-#import cv2
-import numpy as np
-#from keras.models import load_model
+from PIL import Image
+import tensorflow as tf
+from tensorflow.keras.preprocessing import image as kimage
+from tensorflow.keras.applications.inception_v3 import InceptionV3, preprocess_input, decode_predictions
 
-from keras.models import load_model  # TensorFlow is required for Keras to work
-from PIL import Image, ImageOps  # Install pillow instead of PIL
-import numpy as np
+#Usando o modelo já treinado do IncepctionV3 para classificar imagens (poderia ser outro modelo).
+model = InceptionV3(weights='imagenet')
 
-# Disable scientific notation for clarity
-np.set_printoptions(suppress=True)
+def classify_image(image):
+    image = image.convert("RGB")
+    target_size = (299, 299) #Redimensiona imagem
+    image = image.resize(target_size)
 
-# Load the model
-model = load_model("keras_model.h5", compile=False)
+    # Preprocess the image
+    img_array = kimage.img_to_array(image)
+    img_array = preprocess_input(img_array)
+    img_array = tf.expand_dims(img_array, 0)
 
-# Load the labels
-class_names = open("labels.txt", "r").readlines()
+    predictions = model.predict(img_array)
+  
+    decoded_predictions = decode_predictions(predictions)[0]
+    return decoded_predictions
+  
+def main():
+    st.title("Image Classification with InceptionV3")
 
-# Create the array of the right shape to feed into the keras model
-# The 'length' or number of images you can put into the array is
-# determined by the first position in the shape tuple, in this case 1
-data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
-# Replace this with the path to your image
-image = Image.open("snowexample.png").convert("RGB")
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
-# resizing the image to be at least 224x224 and then cropping from the center
-size = (224, 224)
-image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
+        predictions = classify_image(image)
 
-# turn the image into a numpy array
-image_array = np.asarray(image)
+        st.subheader("Classification Results:")
+        for i, (imagenet_id, label, score) in enumerate(predictions):
+            st.write(f"{i + 1}: {label} ({score:.2f})")
 
-# Normalize the image
-normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
-
-# Load the image into the array
-data[0] = normalized_image_array
-
-# Predicts the model
-prediction = model.predict(data)
-index = np.argmax(prediction)
-class_name = class_names[index]
-confidence_score = prediction[0][index]
-
-# Print prediction and confidence score
-print("Class:", class_name[2:], end="")
-print("Confidence Score:", confidence_score)
+if __name__ == "__main__":
+    main()
