@@ -1,4 +1,7 @@
-streamlit
-tensorflow==2.16.2
-keras
+streamlit==1.50.0
+tensorflow==2.20.0
+keras==3.6.0
+h5py
 opencv-python-headless
+numpy
+Pillow
