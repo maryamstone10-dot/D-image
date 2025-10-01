@@ -1,7 +1,2 @@
 streamlit 
 tensorflow 
-keras 
-h5py
-opencv-python-headless
-numpy
-Pillow
