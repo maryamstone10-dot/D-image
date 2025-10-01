@@ -1,48 +1,50 @@
 import streamlit as st
-#import cv2
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.preprocessing import image as tf_image
+import matplotlib.pyplot as plt
 import numpy as np
-#from keras.models import load_model
+from PIL import Image
+from io import BytesIO
 
-from keras.models import load_model  # TensorFlow is required for Keras to work
-from PIL import Image, ImageOps  # Install pillow instead of PIL
-import numpy as np
+st.title('Dynamic Image Classifier using TensorFlow')
 
-# Disable scientific notation for clarity
-np.set_printoptions(suppress=True)
+# Load the pre-trained model
+model = keras.applications.MobileNetV2(weights='imagenet')
 
-# Load the model
-model = load_model("keras_model.h5", compile=False)
+# Define a function to preprocess the image
 
-# Load the labels
-class_names = open("labels.txt", "r").readlines()
 
-# Create the array of the right shape to feed into the keras model
-# The 'length' or number of images you can put into the array is
-# determined by the first position in the shape tuple, in this case 1
-data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
+def preprocess_image(image_data):
+    img = Image.open(BytesIO(image_data))
+    img = img.resize((224, 224))
+    x = tf_image.img_to_array(img)
+    x = np.expand_dims(x, axis=0)
+    x = keras.applications.mobilenet_v2.preprocess_input(x)
+    return x
 
-# Replace this with the path to your image
-image = Image.open("snowexample.png").convert("RGB")
+# Define a function to make predictions
 
-# resizing the image to be at least 224x224 and then cropping from the center
-size = (224, 224)
-image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
 
-# turn the image into a numpy array
-image_array = np.asarray(image)
+def make_prediction(image_data):
+    preprocessed_image = preprocess_image(image_data)
+    predictions = model.predict(preprocessed_image)
+    decoded_predictions = keras.applications.mobilenet_v2.decode_predictions(
+        predictions)
+    return decoded_predictions[0]
 
-# Normalize the image
-normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
 
-# Load the image into the array
-data[0] = normalized_image_array
+# Upload an image
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png"])
+if uploaded_file is not None:
+    # Display the uploaded image
+    image = Image.open(uploaded_file)
+    st.image(image, caption='Uploaded Image.', use_column_width=True)
 
-# Predicts the model
-prediction = model.predict(data)
-index = np.argmax(prediction)
-class_name = class_names[index]
-confidence_score = prediction[0][index]
+    # Make predictions
+    predictions = make_prediction(uploaded_file.getvalue())
 
-# Print prediction and confidence score
-print("Class:", class_name[2:], end="")
-print("Confidence Score:", confidence_score)
+    # Display the predictions
+    st.write('Predictions:')
+    for i, prediction in enumerate(predictions):
+        st.write(f'{i+1}. {prediction[1]} ({prediction[2]*100:.2f}%)')
