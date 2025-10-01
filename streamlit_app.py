@@ -1,69 +1,56 @@
+from keras.models import load_model
 import streamlit as st
+from PIL import Image, ImageOps #Install pillow instead of PIL
 import numpy as np
-from PIL import Image, ImageOps
-from tensorflow.keras.models import load_model  # <-- updated import
-import io
 
-st.set_page_config(page_title="Teachable Machine Image Classifier", page_icon="🧠")
-st.title("🧠 Teachable Machine Image Classifier")
+"""
+# deep Classifier project
+"""
 
-MODEL_PATH = "keras_model.h5"     # make sure this file exists in repo root
-LABELS_PATH = "labels.txt"        # make sure this file exists in repo root
+# Disable scientific notation for clarity
+np.set_printoptions(suppress=True)
 
-@st.cache_resource
-def load_tm_model(path: str):
-    # compile=False for inference-only loading of .h5 in Keras 3 / TF 2.20
-    return load_model(path, compile=False)
+# Load the model
+model = load_model('keras_Model.h5', compile=False)
 
-@st.cache_data
-def load_labels(path: str):
-    with open(path, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f]
+# Load the labels
+class_names = open('labels.txt', 'r').readlines()
 
-# Load model and labels with graceful errors
-try:
-    model = load_tm_model(MODEL_PATH)
-except Exception as e:
-    st.error(f"Could not load model `{MODEL_PATH}`. Ensure it’s in the repo. Details:\n{e}")
-    st.stop()
+# Create the array of the right shape to feed into the keras model
+# The 'length' or number of images you can put into the array is
+# determined by the first position in the shape tuple, in this case 1.
+data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
 
-try:
-    class_names = load_labels(LABELS_PATH)
-except Exception as e:
-    st.error(f"Could not load labels `{LABELS_PATH}`. Ensure it’s in the repo. Details:\n{e}")
-    st.stop()
+# Replace this with the path to your image
+#image = Image.open('MC461.jpeg').convert('RGB')
+uploaded_file = st.file_uploader("Choose a file")
+#image = Image.open(uploaded_file)#.convert('RGB')
+#image=image.convert('RGB')
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
 
-st.markdown("Upload an image (or take a photo). Model expects **224×224 RGB**, normalized to **[-1, 1]**.")
-
-uploaded = st.file_uploader("Choose an image", type=["png", "jpg", "jpeg"])
-camera_image = st.camera_input("Or take a photo")
-
-image_file = uploaded or camera_image
-
-if image_file:
-    # Read into PIL.Image
-    if hasattr(image_file, "getvalue"):  # UploadedFile or camera snapshot
-        image = Image.open(io.BytesIO(image_file.getvalue())).convert("RGB")
-    else:  # Fallback if it's a pathlike (rare in Streamlit Cloud)
-        image = Image.open(image_file).convert("RGB")
-
-    st.image(image, caption="Input image", use_container_width=True)
-
-    # Resize/crop to 224x224 and normalize to [-1, 1] (as in your original script)
+#resize the image to a 224x224 with the same strategy as in TM2:
+#resizing the image to be at least 224x224 and then cropping from the center
     size = (224, 224)
+    #imgage = image.resize((224,224))
     image = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
-    image_array = np.asarray(image).astype(np.float32)
-    normalized = (image_array / 127.5) - 1.0
-    data = np.expand_dims(normalized, axis=0)  # shape (1, 224, 224, 3)
 
-    with st.spinner("Predicting..."):
-        preds = model.predict(data)
-        idx = int(np.argmax(preds[0]))
-        score = float(preds[0][idx])
-        label = class_names[idx] if idx < len(class_names) else f"Class {idx}"
+    #turn the image into a numpy array
+    image_array = np.asarray(image)
 
-    st.success(f"Prediction: **{label}**")
-    st.write(f"Confidence: **{score:.4f}**")
+    # Normalize the image
+    normalized_image_array = (image_array.astype(np.float32) / 127.0) - 1
 
-st.caption("Make sure `keras_model.h5` and `labels.txt` are in the same folder as this app.")
+    # Load the image into the array
+    data[0] = normalized_image_array
+
+    # run the inference
+    prediction = model.predict(data)
+    index = np.argmax(prediction)
+    class_name = class_names[index]
+    confidence_score = prediction[0][index]
+    st.image(image, caption=class_name)
+    st.image(image,caption=confidence_score)
+    print('Class:', class_name, end='')
+    print('Confidence score:', confidence_score)
 
